@@ -1,0 +1,77 @@
+#####################################################################
+## mbuffer configuration file
+## /etc/mbuffer.rc
+## ${PREFIX}/etc/mbuffer.rc
+## ${HOME}/.mbuffer.rc
+#####################################################################
+## valid values for boolean options are:
+## yes, true, on, 1
+## no, false, off, 0
+#####################################################################
+
+
+## set verbosity
+## valid values are 0..6 or silent,fatal,error,warning,info,debug,io
+# Verbose = warning
+
+## size of one block [kB]
+# Blocksize = 10240
+
+## number of blocks in buffer [1]
+# Numblocks = 256
+
+## total amount of buffer memory [kB] or [%]
+## values > 100 mean kB
+## values < 100 mean percentage of physical memory
+## 0 means automatic determination
+# TotalMem = 0
+
+## maximum write speed [kB/s]
+## 0 means no limit
+# MaxWriteSpeed = 0
+
+## maximum read speed [kB/s]
+## 0 means no limit
+# MaxReadSpeed = 0
+
+## time to sleep between to I/O ops [usec]
+# pause = 0
+
+## time to wait after executing an autoload command [sec]
+# autoloadtime = 0
+
+## low watermark value in percent [%]
+## reading starts when buffer fill percentage drops below this value
+# startread = 100
+
+## high watermark value in percent [%]
+## writing starts when buffer fill percentage raises above this value
+# startwrite = 0
+
+## watchdog timeout [sec]
+## 0 means no timeout
+# timeout = 0
+
+## print status to terminal [boolean]
+# showstatus = yes
+
+## log status to log file [boolean]
+# logstatus = on
+
+## lock buffer memory in physical memory [boolean]
+## request to OS to suppress paging/swapping of buffer memory
+# memlock = 0
+
+## print mbuffer's process-id when starting [boolean]
+# printpid = 0
+
+## status interval time [sec]
+# StatusInterval=0.5
+
+## TCP transmission buffer size [bytes]
+## 0 means: keep OS default
+# TCPbufsize = 0
+
+## tape aware out-of-space handling
+## valid values are: true, false, 0, 1, on, off
+# Tapeaware = false

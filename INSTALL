@@ -1,0 +1,12 @@
+# To install run
+./configure
+
+# with the options you desire.
+# To get a list of the possible options, run:
+./configure --help
+
+# Then just do a:
+make && make install
+
+# to run the test suite:
+make check

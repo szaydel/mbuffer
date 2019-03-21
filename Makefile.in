@@ -1,0 +1,163 @@
+CC		= @CC@
+DEFS		= @DEFS@ -DPREFIX=\"${prefix}\"
+CFLAGS		= @CFLAGS@ $(DEFS) -I@srcdir@ -I.
+LDFLAGS		= @LDFLAGS@
+LIBS		= @LIBS@
+EXE		= @EXEEXT@
+SHELL		= /bin/sh
+CP		= @CP@
+AWK		= @AWK@
+OBJDUMP		= @OBJDUMP@
+
+VPATH		= @srcdir@
+prefix		= @prefix@
+exec_prefix     = @exec_prefix@
+datarootdir	= @datarootdir@
+bindir          = @bindir@
+mandir		= @mandir@/man1
+etcdir		= @sysconfdir@
+
+RM		= @RM@
+INSTALL		= @INSTALL@
+TAR		= @TAR@
+
+TARGET		= mbuffer$(EXE)
+SOURCES		= log.c network.c mbuffer.c hashing.c input.c common.c settings.c globals.c
+OBJECTS		= $(SOURCES:.c=.o)
+
+TESTTREE	= /bin /usr/bin
+
+.PHONY: clean all distclean install check testcleanup
+
+all: $(TARGET) idev.so tapetest.so have-af
+
+$(OBJECTS): config.h Makefile
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+
+have-af: have-af.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) have-af.c $(LIBS) -o $@
+
+clean:
+	-$(RM) $(OBJECTS)
+
+distclean: clean
+	-$(RM) $(TARGET) config.h config.log \
+	config.status Makefile mbuffer.1 core
+
+$(DESTDIR)$(etcdir)/mbuffer.rc:
+	-$(INSTALL) -d -m 755 $(DESTDIR)$(etcdir)
+	$(INSTALL) -m 644 mbuffer.rc $(DESTDIR)$(etcdir)
+
+install: $(TARGET) $(DESTDIR)$(etcdir)/mbuffer.rc
+	-$(INSTALL) -d -m 755 $(DESTDIR)$(bindir)
+	$(INSTALL) -m 755 $(TARGET) $(DESTDIR)$(bindir)/
+	-$(INSTALL) -d -m 755 $(DESTDIR)$(mandir)
+	$(INSTALL) -m 644 mbuffer.1 $(DESTDIR)$(mandir)/
+
+lint:
+	lint $(DEFS) $(SOURCES)
+
+check: $(TARGET) test0 test1 test2 test3 test4 test5 test6 test7
+
+testcleanup:
+	rm -f test0 test1 test2 test3 test4 test5 \
+		test0.md5 test1.md5 test2.md5 test3.md5 test4.md5 test5.md5 \
+		test.tar test.md5 mbuffer.md5 idev.so tapetest.so have-af
+
+test.tar:
+	$(TAR) cf test.tar --ignore-failed-read $(TESTTREE)
+
+test.md5: test.tar
+	openssl md5 < test.tar > test.md5
+
+test0: test.md5
+	./mbuffer -i test.tar -p10 | ./mbuffer -q -P 90 | openssl md5 > test0.md5
+	sync
+	diff test0.md5 test.md5
+	touch test0
+
+test1: test.md5
+	./mbuffer -i test.tar -f -o $@.tar -o /dev/null -H
+	openssl md5 < $@.tar > $@.md5
+	rm -f $@.tar
+	sync
+	diff $@.md5 test.md5
+	touch $@
+
+test2: test.md5 have-af
+	if ./have-af inet; then \
+		./mbuffer --pid -q -4 -I :7001 -o $@.tar -o - | openssl md5 > $@.md5 & \
+		sleep 1; \
+		rm -f $@.tar; \
+		./mbuffer --pid -i test.tar -o /dev/null -4 -O localhost:7001 -H; \
+		wait; \
+	else \
+		echo 'SKIPPING the IPv4-only test!'; \
+		cp test.tar $@.tar; \
+		cp test.md5 $@.md5; \
+	fi
+	sync
+	diff $@.md5 test.md5
+	rm $@.md5
+	openssl md5 < $@.tar > $@.md5 
+	rm -f $@.tar
+	sync
+	diff $@.md5 test.md5
+	touch $@
+
+test3: test.md5 have-af
+	if ./have-af inet6; then \
+		./mbuffer --pid -q -6 -I :7002 | openssl md5 > $@.md5 & \
+			sleep 1; \
+			rm -f $@.tar; \
+			./mbuffer --pid -i test.tar -o /dev/null -6 -O ::1:7002 -o $@.tar -H; \
+			wait; \
+	else \
+		echo 'SKIPPING the IPv6-only test!'; \
+		cp test.tar $@.tar; \
+		cp test.md5 $@.md5; \
+	fi
+	sync
+	diff $@.md5 test.md5
+	rm $@.md5
+	openssl md5 < $@.tar > $@.md5 
+	rm -f $@.tar
+	sync
+	diff $@.md5 test.md5
+	touch $@
+
+mbuffer.md5: mbuffer
+	openssl md5 > mbuffer.md5 < mbuffer 
+
+# Multi-volume test
+test4: test.md5 tapetest.so mbuffer.md5
+	rm -f output-$@.tar.*
+	cat mbuffer | LD_PRELOAD=./tapetest.so ./mbuffer -s10k -f -o output-$@ -H -A "echo '[$@] Replacing tape'"
+	cat output-$@* | openssl md5 > $@.md5
+	rm -f output-$@
+	sync
+	diff $@.md5 mbuffer.md5 > $@
+
+# Multi-volume test with --tapeaware
+test5: test.md5 tapetest.so mbuffer.md5
+	rm -f output-$@.tar.*
+	cat mbuffer | LD_PRELOAD=./tapetest.so ./mbuffer -s10k -f -o output-$@ -H -A "echo '[$@] Replacing tape'" --tapeaware
+	cat output-$@* | openssl md5 > $@.md5
+	rm -f output-$@
+	sync
+	diff $@.md5 mbuffer.md5 > $@
+
+
+test6: mbuffer idev.so
+	LD_PRELOAD=./idev.so BSIZE=317 IDEV=mbuffer ./mbuffer -s256 -i mbuffer -f -o mbuffer2
+
+test7: mbuffer
+	./mbuffer -P90 --md5 -i INSTALL -o /dev/null
+
+tapetest.so: tapetest.c config.h
+	$(CC) $(CFLAGS) -shared -fPIC tapetest.c -o $@ $(LIBS)
+
+idev.so: idev.c config.h
+	$(CC) $(CFLAGS) -shared -g -fPIC idev.c -o $@ $(LIBS)
